@@ -1,0 +1,99 @@
+name: Terraform Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'terraform/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+jobs:
+  pre-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deployment approval
+        if: github.event.inputs.environment == 'prod'
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: admin1,admin2
+          minimum-approvals: 2
+          timeout-minutes: 30
+
+  deploy:
+    needs: pre-deploy
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Terraform Init
+        working-directory: ./terraform/environments/${{ github.event.inputs.environment || 'dev' }}
+        run: |
+          terraform init \
+            -backend-config="storage_account_name=${{ secrets.TF_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ secrets.TF_CONTAINER_NAME }}" \
+            -backend-config="key=${{ github.event.inputs.environment || 'dev' }}.tfstate" \
+            -backend-config="sas_token=${{ secrets.TF_SAS_TOKEN }}"
+
+      - name: Terraform Workspace
+        working-directory: ./terraform/environments/${{ github.event.inputs.environment || 'dev' }}
+        run: |
+          terraform workspace select ${{ github.event.inputs.environment || 'dev' }} || terraform workspace new ${{ github.event.inputs.environment || 'dev' }}
+
+      - name: Terraform Plan
+        working-directory: ./terraform/environments/${{ github.event.inputs.environment || 'dev' }}
+        run: terraform plan -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ./terraform/environments/${{ github.event.inputs.environment || 'dev' }}
+        run: terraform apply -auto-approve tfplan
+
+  post-deploy:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Run Post-Deployment Validation
+        shell: pwsh
+        run: |
+          Write-Host "Running Terraform post-deployment validation..."
+          # Add validation scripts here
+
+      - name: Notify Deployment Status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const success = context.job.status === 'success';
+            const environment = process.env.ENVIRONMENT || 'dev';
+            const message = `Terraform deployment to ${environment} ${success ? 'succeeded' : 'failed'}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              body: message
+            }); 

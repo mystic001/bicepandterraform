@@ -1,0 +1,88 @@
+name: Bicep Deployment
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'bicep/**'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+jobs:
+  pre-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check deployment approval
+        if: github.event.inputs.environment == 'prod'
+        uses: trstringer/manual-approval@v1
+        with:
+          secret: ${{ secrets.GITHUB_TOKEN }}
+          approvers: admin1,admin2
+          minimum-approvals: 2
+          timeout-minutes: 30
+
+  deploy:
+    needs: pre-deploy
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'dev' }}
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy Bicep template
+        uses: azure/arm-deploy@v1
+        with:
+          scope: resourcegroup
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          resourceGroupName: ${{ format('rg-{0}', github.event.inputs.environment || 'dev') }}
+          template: ./bicep/environments/${{ github.event.inputs.environment || 'dev' }}/main.bicep
+          parameters: >
+            environment=${{ github.event.inputs.environment || 'dev' }}
+            location=${{ secrets.AZURE_LOCATION }}
+          failOnStdErr: true
+
+  post-deploy:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Run Post-Deployment Validation
+        shell: pwsh
+        run: |
+          Write-Host "Running Bicep post-deployment validation..."
+          # Add validation scripts here
+
+      - name: Notify Deployment Status
+        if: always()
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const success = context.job.status === 'success';
+            const environment = process.env.ENVIRONMENT || 'dev';
+            const message = `Bicep deployment to ${environment} ${success ? 'succeeded' : 'failed'}`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.name,
+              body: message
+            }); 

@@ -1,0 +1,19 @@
+name: PowerShell Tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/powershell/**'
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Run Pester Tests
+        shell: pwsh
+        run: |
+          Install-Module Pester -Force
+          Invoke-Pester ./scripts/powershell/tests -CI

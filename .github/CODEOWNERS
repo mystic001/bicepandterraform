@@ -1,0 +1,11 @@
+# Bicep files
+/bicep/ @infrastructure-team
+
+# Terraform files
+/terraform/ @infrastructure-team
+
+# PowerShell scripts
+/scripts/powershell/ @automation-team
+
+# Workflow files
+/.github/workflows/ @devops-team 
