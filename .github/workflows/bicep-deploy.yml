@@ -17,11 +17,6 @@ on:
           - staging
           - prod
 
-env:
-  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-
 jobs:
   pre-deploy:
     runs-on: ubuntu-latest
@@ -48,17 +43,52 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      # Optional: Install Bicep CLI if needed
+      - name: Install Bicep CLI
+        run: |
+          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
+          chmod +x ./bicep
+          sudo mv ./bicep /usr/local/bin/bicep
+          bicep --version
+
+      # Validate Bicep files
+      - name: Validate Bicep templates
+        run: |
+          bicep build ./bicep/main.bicep
+          
+      # Deploy Resource Group if it doesn't exist
+      - name: Create Resource Group
+        uses: azure/cli@v1
+        with:
+          inlineScript: |
+            az group create \
+              --name ${{ format('rg-{0}', github.event.inputs.environment || 'dev') }} \
+              --location ${{ secrets.AZURE_LOCATION }} \
+              --tags Environment=${{ github.event.inputs.environment || 'dev' }}
+
+      # Deploy using main template and parameter file
       - name: Deploy Bicep template
         uses: azure/arm-deploy@v1
         with:
           scope: resourcegroup
-          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          subscriptionId: ${{ fromJson(secrets.AZURE_CREDENTIALS).subscriptionId }}
           resourceGroupName: ${{ format('rg-{0}', github.event.inputs.environment || 'dev') }}
-          template: ./bicep/environments/${{ github.event.inputs.environment || 'dev' }}/main.bicep
-          parameters: >
-            environment=${{ github.event.inputs.environment || 'dev' }}
-            location=${{ secrets.AZURE_LOCATION }}
+          template: ./bicep/main.bicep
+          parameters: ./bicep/parameters/${{ github.event.inputs.environment || 'dev' }}.parameters.json
+          deploymentName: ${{ format('bicep-deploy-{0}-{1}', github.event.inputs.environment || 'dev', github.run_number) }}
           failOnStdErr: true
+
+      # Optional: Add tags to resources
+      - name: Tag Resources
+        uses: azure/cli@v1
+        with:
+          inlineScript: |
+            az tag create \
+              --resource-group ${{ format('rg-{0}', github.event.inputs.environment || 'dev') }} \
+              --tags DeploymentId=${{ github.run_number }} \
+                    Environment=${{ github.event.inputs.environment || 'dev' }} \
+                    GitRepo=${{ github.repository }} \
+                    GitCommit=${{ github.sha }}
 
   post-deploy:
     needs: deploy
@@ -77,12 +107,14 @@ jobs:
         with:
           script: |
             const success = context.job.status === 'success';
-            const environment = process.env.ENVIRONMENT || 'dev';
+            const environment = '${{ github.event.inputs.environment || 'dev' }}';
             const message = `Bicep deployment to ${environment} ${success ? 'succeeded' : 'failed'}`;
             
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.name,
-              body: message
-            }); 
+            if (context.issue.number) {
+              github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.name,
+                body: message
+              });
+            } 
