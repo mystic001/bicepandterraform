@@ -53,16 +53,6 @@ jobs:
       - name: Validate Bicep templates
         run: |
           bicep build ./bicep/main.bicep
-          
-      # Deploy Resource Group if it doesn't exist
-      - name: Create Resource Group
-        uses: azure/cli@v1
-        with:
-          inlineScript: |
-            az group create \
-              --name ${{ format('rg-{0}', github.event.inputs.environment || 'dev') }} \
-              --location ${{ secrets.AZURE_LOCATION }} \
-              --tags Environment=${{ github.event.inputs.environment || 'dev' }}
 
       # Deploy using main template and parameter file
       - name: Deploy Bicep template
