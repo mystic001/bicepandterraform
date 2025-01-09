@@ -19,13 +19,6 @@
                         "metadata": {
                             "purpose": "application-data"
                         }
-                    },
-                    {
-                        "name": "backup",
-                        "publicAccess": "None",
-                        "metadata": {
-                            "purpose": "backup-storage"
-                        }
                     }
                 ]
             }

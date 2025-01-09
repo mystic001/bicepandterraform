@@ -22,14 +22,6 @@
                         }
                     },
                     {
-                        "name": "backup",
-                        "publicAccess": "None",
-                        "metadata": {
-                            "purpose": "backup-storage",
-                            "environment": "production"
-                        }
-                    },
-                    {
                         "name": "archive",
                         "publicAccess": "None",
                         "metadata": {
