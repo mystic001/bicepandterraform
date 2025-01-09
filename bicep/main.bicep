@@ -34,4 +34,4 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 
 // Outputs (optional - useful for referencing in other deployments)
 output resourceGroupName string = resourceGroup.name
-// output appServicePlanId string = appServicePlan.outputs.appServicePlanId
+
