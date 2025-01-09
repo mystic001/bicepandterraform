@@ -1,3 +1,24 @@
+variable "subscription_id" {
+  type        = string
+  description = "Azure Subscription ID"
+}
+
+variable "tenant_id" {
+  type        = string
+  description = "Azure Tenant ID"
+}
+
+variable "client_id" {
+  type        = string
+  description = "Azure Client ID"
+}
+
+variable "client_secret" {
+  type        = string
+  description = "Azure Client Secret"
+  sensitive   = true
+}
+
 variable "resource_group_name" {
   type        = string
   description = "Name of the resource group"
@@ -12,7 +33,7 @@ variable "location" {
 variable "environment" {
   type        = string
   description = "Environment name (dev, staging, prod)"
-  default = "dev"
+  default     = "dev"
 }
 
 variable "tags" {
