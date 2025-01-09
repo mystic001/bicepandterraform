@@ -7,6 +7,19 @@
         },
         "location": {
             "value": "eastus"
+        },
+        "storageAccountSettings": {
+            "value": {
+                "name": "stdevaccount123unique",
+                "sku": "Standard_LRS"
+            }
+        },
+        "tags": {
+            "value": {
+                "Environment": "dev",
+                "Project": "StorageDemo",
+                "CostCenter": "IT"
+            }
         }
     }
 }

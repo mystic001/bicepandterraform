@@ -3,19 +3,23 @@
     "contentVersion": "1.0.0.0",
     "parameters": {
         "environment": {
-            "value": "development"
+            "value": "prod"
         },
         "location": {
             "value": "eastus"
         },
-        "aspName": {
-            "value": "asp-prod"
+        "storageAccountSettings": {
+            "value": {
+                "name": "stprodaccount123unique",
+                "sku": "Standard_GRS"
+            }
         },
-        "aspSku": {
-            "value": "B1"
-        },
-        "aspKind": {
-            "value": "linux"
+        "tags": {
+            "value": {
+                "Environment": "prod",
+                "Project": "StorageDemo",
+                "CostCenter": "IT"
+            }
         }
     }
 }
