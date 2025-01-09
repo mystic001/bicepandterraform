@@ -68,18 +68,6 @@ jobs:
           # parameters: "./bicep/parameters/${{ github.event.inputs.environment || 'dev' }}.parameters.json"
           failOnStdErr: true
 
-      # Optional: Add tags to resources
-      - name: Tag Resources
-        uses: azure/cli@v1
-        with:
-          inlineScript: |
-            az tag create \
-              --resource-group ${{ format('rg-{0}', github.event.inputs.environment || 'dev') }} \
-              --tags DeploymentId=${{ github.run_number }} \
-                    Environment=${{ github.event.inputs.environment || 'dev' }} \
-                    GitRepo=${{ github.repository }} \
-                    GitCommit=${{ github.sha }}
-
   post-deploy:
     needs: deploy
     runs-on: ubuntu-latest
