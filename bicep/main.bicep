@@ -49,6 +49,7 @@ module storage 'modules/storage/storageAccount.bicep' = {
     location: location
     skuName: storageAccountSettings.sku
     enableBlobEncryption: true
+    containers: storageAccountSettings.containers
     tags: union(tags, {
       Service: 'Storage'
     })

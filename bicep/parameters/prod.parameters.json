@@ -11,7 +11,33 @@
         "storageAccountSettings": {
             "value": {
                 "name": "stprodaccount123unique",
-                "sku": "Standard_GRS"
+                "sku": "Standard_GRS",
+                "containers": [
+                    {
+                        "name": "data",
+                        "publicAccess": "None",
+                        "metadata": {
+                            "purpose": "application-data",
+                            "environment": "production"
+                        }
+                    },
+                    {
+                        "name": "backup",
+                        "publicAccess": "None",
+                        "metadata": {
+                            "purpose": "backup-storage",
+                            "environment": "production"
+                        }
+                    },
+                    {
+                        "name": "archive",
+                        "publicAccess": "None",
+                        "metadata": {
+                            "purpose": "long-term-storage",
+                            "environment": "production"
+                        }
+                    }
+                ]
             }
         },
         "tags": {
