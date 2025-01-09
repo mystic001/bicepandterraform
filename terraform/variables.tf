@@ -12,6 +12,7 @@ variable "location" {
 variable "environment" {
   type        = string
   description = "Environment name (dev, staging, prod)"
+  default = "dev"
 }
 
 variable "tags" {
