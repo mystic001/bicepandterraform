@@ -7,11 +7,17 @@ provider "azurerm" {
 resource "azurerm_resource_group" "rg" {
   name     = var.resource_group_name
   location = var.location
+  tags     = var.tags
+}
 
-  tags = merge(var.tags, {
-    Environment = var.environment
-    ManagedBy   = "Terrafrom"
-  })
+# Example of using variables in other resources
+resource "azurerm_storage_account" "storage" {
+  name                     = "st${var.environment}${random_string.random.result}"
+  resource_group_name      = azurerm_resource_group.rg.name
+  location                 = var.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  tags                     = var.tags
 }
 
 # Outputs

@@ -1,6 +1,6 @@
 variable "subscription_id" {
   type        = string
-  description = "Azure Subscription ID"
+  description = "Azure subscription ID"
 }
 
 variable "tenant_id" {
@@ -26,18 +26,15 @@ variable "resource_group_name" {
 
 variable "location" {
   type        = string
-  description = "Azure region where resources will be created"
-  default     = "eastus"
+  description = "Azure region for resources"
 }
 
 variable "environment" {
   type        = string
-  description = "Environment name (dev, staging, prod)"
-  default     = "dev"
+  description = "Environment (dev, staging, prod)"
 }
 
 variable "tags" {
   type        = map(string)
-  description = "Tags to apply to all resources"
-  default     = {}
+  description = "Tags for resources"
 } 
