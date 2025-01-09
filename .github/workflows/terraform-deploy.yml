@@ -46,18 +46,10 @@ jobs:
         ls -la
         
     - name: Terraform Init
-      # Update working directory to match your repository structure
       working-directory: ./terraform
       run: |
         terraform init \
-          -backend-config="storage_account_name=${{ secrets.TF_STORAGE_ACCOUNT }}" \
-          -backend-config="container_name=${{ secrets.TF_CONTAINER_NAME }}" \
-          -backend-config="key=${{ github.event.inputs.environment || 'dev' }}.tfstate" \
-          -backend-config="resource_group_name=${{ secrets.TF_RESOURCE_GROUP }}" \
-          -backend-config="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-          -backend-config="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
-          -backend-config="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
-          -backend-config="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}"
+          -backend-config="environments/${{ github.event.inputs.environment || 'dev' }}/backend.tfvars"
 
     - name: Terraform Format and Unlock
       working-directory: ./terraform
@@ -70,10 +62,7 @@ jobs:
       working-directory: ./terraform
       run: |
         terraform plan \
-          -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
-          -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
-          -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
-          -var="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}" \
+          -var-file="environments/${{ github.event.inputs.environment || 'dev' }}/terraform.tfvars" \
           -out=tfplan
 
     - name: Terraform Apply
@@ -110,3 +99,11 @@ jobs:
               body: message
             });
           } 
+
+    env:
+      TF_VAR_environment: ${{ github.event.inputs.environment || 'dev' }}
+      TF_VAR_location: "eastus2"
+      TF_VAR_subscription_id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      TF_VAR_tenant_id: ${{ secrets.AZURE_TENANT_ID }}
+      TF_VAR_client_id: ${{ secrets.AZURE_CLIENT_ID }}
+      TF_VAR_client_secret: ${{ secrets.AZURE_CLIENT_SECRET }} 
