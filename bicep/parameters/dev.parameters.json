@@ -4,18 +4,7 @@
     "parameters": {
         "environment": {
             "value": "dev"
-        },
-        "location": {
-            "value": "eastus"
-        },
-        "aspName": {
-            "value": "asp-devu"
-        },
-        "aspSku": {
-            "value": "B1"
-        },
-        "aspKind": {
-            "value": "linux"
         }
+        
     }
 }
