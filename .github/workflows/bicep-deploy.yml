@@ -43,13 +43,11 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # Optional: Install Bicep CLI if needed
+      # Install Bicep CLI using Azure CLI
       - name: Install Bicep CLI
         run: |
-          curl -Lo bicep https://github.com/Azure/bicep/releases/latest/download/bicep-linux-x64
-          chmod +x ./bicep
-          sudo mv ./bicep /usr/local/bin/bicep
-          bicep --version
+          az bicep install
+          az bicep version
 
       # Validate Bicep files
       - name: Validate Bicep templates
