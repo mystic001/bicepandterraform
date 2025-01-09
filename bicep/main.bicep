@@ -5,9 +5,9 @@ param environment string
 param location string
 
 // App Service Plan parameters
-param aspName string
-param aspSku string
-param aspKind string
+// param aspName string
+// param aspSku string
+// param aspKind string
 
 // Resource Group
 resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
