@@ -10,7 +10,7 @@ resource "azurerm_resource_group" "rg" {
 
   tags = merge(var.tags, {
     Environment = var.environment
-    ManagedBy   = "Terraform"
+    ManagedBy   = "Terrafrorm"
   })
 }
 
