@@ -21,17 +21,17 @@ resource resourceGroup 'Microsoft.Resources/resourceGroups@2021-04-01' = {
 }
 
 // Module for App Service Plan
-module appServicePlan 'modules/appServicePlan.bicep' = {
-  scope: resourceGroup
-  name: 'asp-deployment'
-  params: {
-    aspName: aspName
-    location: location
-    aspSku: aspSku
-    aspKind: aspKind
-  }
-}
+// module appServicePlan 'modules/appServicePlan.bicep' = {
+//   scope: resourceGroup
+//   name: 'asp-deployment'
+//   params: {
+//     aspName: aspName
+//     location: location
+//     aspSku: aspSku
+//     aspKind: aspKind
+//   }
+// }
 
 // Outputs (optional - useful for referencing in other deployments)
 output resourceGroupName string = resourceGroup.name
-output appServicePlanId string = appServicePlan.outputs.appServicePlanId
+// output appServicePlanId string = appServicePlan.outputs.appServicePlanId
