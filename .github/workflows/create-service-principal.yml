@@ -1,0 +1,134 @@
+name: Create Environment Service Principal
+
+on:
+  workflow_dispatch:
+    inputs:
+      targetEnvironment:
+        description: 'Target Environment to create SPN for'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+      customEnvironment:
+        description: 'Custom environment name (leave empty if using selection above)'
+        required: false
+        type: string
+      spnName:
+        description: 'Service Principal Name'
+        required: true
+        default: 'azure-deploy-spn'
+      roleName:
+        description: 'Azure Role'
+        required: true
+        default: 'Contributor'
+        type: choice
+        options:
+          - Contributor
+          - Owner
+          - Reader
+
+permissions:
+  contents: read
+  id-token: write
+  actions: write
+
+jobs:
+  create-spn:
+    runs-on: ubuntu-latest
+    environment: "dev"
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set Target Environment
+      run: |
+        TARGET_ENV="${{ github.event.inputs.customEnvironment || github.event.inputs.targetEnvironment }}"
+        echo "TARGET_ENVIRONMENT=$TARGET_ENV" >> $GITHUB_ENV
+        echo "Creating service principal for environment: $TARGET_ENV"
+
+    - name: Azure Login
+      uses: azure/login@v1
+      with:
+        creds: ${{ secrets.AUTOMATION_AZURE_CREDENTIALS }}
+
+    - name: Install Az PowerShell module
+      shell: pwsh
+      run: |
+        Install-Module -Name Az -Force -AllowClobber -Scope CurrentUser
+        
+    - name: Execute Service Principal Creation Script
+      id: create-sp
+      shell: pwsh
+      env:
+        SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      run: |
+        $result = ./scripts/Create-ServicePrincipal.ps1 `
+          -SubscriptionId $env:SUBSCRIPTION_ID `
+          -TenantId $env:TENANT_ID `
+          -SpnName "${{ github.event.inputs.spnName }}-$env:TARGET_ENVIRONMENT" `
+          -RoleName '${{ github.event.inputs.roleName }}'
+        
+        # Save credentials for secret creation
+        $result | Out-File -FilePath "spn_credentials.json"
+        
+        # Parse and set outputs
+        $jsonResult = $result | ConvertFrom-Json
+        echo "::set-output name=credentials_file::spn_credentials.json"
+        echo "::set-output name=subscription_id::$($jsonResult.subscriptionId)"
+        echo "::set-output name=tenant_id::$($jsonResult.tenantId)"
+
+    - name: Set Environment Secrets
+      env:
+        GH_TOKEN: ${{ secrets.GH_PA_TOKEN }}
+      run: |
+        # Set AZURE_CREDENTIALS
+        gh secret set AZURE_CREDENTIALS \
+          --repo ${{ github.repository }} \
+          --env ${{ env.TARGET_ENVIRONMENT }} \
+          --body-file ${{ steps.create-sp.outputs.credentials_file }}
+        
+        # Set SUBSCRIPTION_ID
+        gh secret set AZURE_SUBSCRIPTION_ID \
+          --repo ${{ github.repository }} \
+          --env ${{ env.TARGET_ENVIRONMENT }} \
+          --body "${{ steps.create-sp.outputs.subscription_id }}"
+        
+        # Set TENANT_ID
+        gh secret set AZURE_TENANT_ID \
+          --repo ${{ github.repository }} \
+          --env ${{ env.TARGET_ENVIRONMENT }} \
+          --body "${{ steps.create-sp.outputs.tenant_id }}"
+
+    # Verify all secrets exist
+    - name: Verify Secret Creation
+      env:
+        GH_TOKEN: ${{ secrets.GH_PA_TOKEN }}
+      run: |
+        SECRETS_TO_CHECK=("AZURE_CREDENTIALS" "AZURE_SUBSCRIPTION_ID" "AZURE_TENANT_ID")
+        MISSING_SECRETS=()
+        
+        for secret in "${SECRETS_TO_CHECK[@]}"; do
+          if gh secret list --repo ${{ github.repository }} --env ${{ env.TARGET_ENVIRONMENT }} | grep -q "$secret"; then
+            echo "✓ $secret secret verified in ${{ env.TARGET_ENVIRONMENT }} environment"
+          else
+            MISSING_SECRETS+=("$secret")
+            echo "❌ Could not verify $secret secret"
+          fi
+        done
+        
+        if [ ${#MISSING_SECRETS[@]} -ne 0 ]; then
+          echo "Failed to verify all secrets. Missing: ${MISSING_SECRETS[*]}"
+          exit 1
+        fi
+
+    - name: Add Summary
+      run: |
+        echo "## Service Principal Created Successfully! :white_check_mark:" >> $GITHUB_STEP_SUMMARY
+        echo "Target Environment: ${{ env.TARGET_ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### :lock: Security Note" >> $GITHUB_STEP_SUMMARY
+        echo "The credentials have been automatically saved as repository secrets for the ${{ env.TARGET_ENVIRONMENT }} environment." >> $GITHUB_STEP_SUMMARY 

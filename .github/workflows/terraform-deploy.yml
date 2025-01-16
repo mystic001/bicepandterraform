@@ -14,20 +14,27 @@ on:
         type: choice
         options:
           - dev
-          - staging
           - prod
-
-permissions:
-  contents: read
-  pull-requests: write
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    environment: ${{ github.event.inputs.environment || 'dev' }}
+    # Set environment based on branch or manual input
+    environment: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.environment || github.ref == 'refs/heads/main' && 'prod' || 'dev' }}
 
     steps:
     - uses: actions/checkout@v3
+
+    # Add step to determine environment
+    - name: Set Environment
+      run: |
+        if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          echo "ENVIRONMENT=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+        elif [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          echo "ENVIRONMENT=prod" >> $GITHUB_ENV
+        else
+          echo "ENVIRONMENT=dev" >> $GITHUB_ENV
+        fi
 
     - name: Azure Login
       uses: azure/login@v1
@@ -39,41 +46,40 @@ jobs:
       with:
         terraform_version: "1.5.0"
 
-    # Add debug step to check directory structure
-    - name: Debug Directory
+    # Debug step to verify environment and directory
+    - name: Debug Info
       run: |
+        echo "Current Environment: ${{ env.ENVIRONMENT }}"
+        echo "Current Branch: ${{ github.ref }}"
         pwd
-        ls -la
-        
+        ls -la terraform/environments/${{ env.ENVIRONMENT }}
+
     - name: Terraform Init
       working-directory: ./terraform
       run: |
         terraform init \
           -backend-config="storage_account_name=${{ secrets.TF_STORAGE_ACCOUNT }}" \
           -backend-config="container_name=${{ secrets.TF_CONTAINER_NAME }}" \
-          -backend-config="key=${{ github.event.inputs.environment || 'dev' }}.tfstate" \
+          -backend-config="key=${{ env.ENVIRONMENT }}.tfstate" \
           -backend-config="resource_group_name=${{ secrets.TF_RESOURCE_GROUP }}" \
           -backend-config="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
           -backend-config="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
           -backend-config="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
           -backend-config="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}"
 
-    - name: Terraform Format and Unlock
-      working-directory: ./terraform
-      continue-on-error: true
-      run: |
-        terraform fmt -check
-        terraform force-unlock -force "ff12e37e-1019-92ab-f98a-2002947b9cf2"
-
     - name: Terraform Plan
       working-directory: ./terraform
       run: |
         terraform plan \
-          -var-file="environments/${{ github.event.inputs.environment || 'dev' }}/terraform.tfvars" \
+          -var-file="environments/${{ env.ENVIRONMENT }}/terraform.tfvars" \
+          -var="subscription_id=${{ secrets.AZURE_SUBSCRIPTION_ID }}" \
+          -var="tenant_id=${{ secrets.AZURE_TENANT_ID }}" \
+          -var="client_id=${{ secrets.AZURE_CLIENT_ID }}" \
+          -var="client_secret=${{ secrets.AZURE_CLIENT_SECRET }}" \
           -out=tfplan
 
     - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+      if: success()
       working-directory: ./terraform
       run: terraform apply -auto-approve tfplan
 
@@ -95,7 +101,7 @@ jobs:
       with:
         script: |
           const success = context.job.status === 'success';
-          const environment = '${{ github.event.inputs.environment || 'dev' }}';
+          const environment = process.env.ENVIRONMENT;
           const message = `Terraform deployment to ${environment} ${success ? 'succeeded' : 'failed'}`;
           
           if (context.issue.number) {

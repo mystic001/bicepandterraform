@@ -5,12 +5,29 @@ on:
     paths:
       - 'terraform/**'
     branches: [ main, develop ]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to validate'
+        required: true
+        default: 'develop'
+        type: string
+      environment:
+        description: 'Environment to validate against'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
 
 jobs:
   validate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
       
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v2
@@ -26,3 +43,63 @@ jobs:
       - name: Terraform Validate
         run: terraform validate
         working-directory: ./terraform
+
+      # Install and run TFLint
+      - name: Setup TFLint
+        uses: terraform-linters/setup-tflint@v3
+        with:
+          tflint_version: v0.44.1
+
+      - name: Run TFLint
+        run: |
+          tflint --init
+          tflint -f compact
+        working-directory: ./terraform
+
+      # Run tfsec
+      - name: Run tfsec
+        uses: aquasecurity/tfsec-action@v1.0.0
+        with:
+          working_directory: terraform
+
+      # Upload scan results
+      - name: Upload SARIF file
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: tfsec.sarif
+
+      # Run checkov
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform
+          framework: terraform
+          soft_fail: true
+          output_format: sarif
+          quiet: true
+          download_external_modules: true
+
+      # Add summary of all checks
+      - name: Add Validation Summary
+        if: always()
+        run: |
+          echo "## Terraform Validation Results :mag:" >> $GITHUB_STEP_SUMMARY
+          echo "### Format Check" >> $GITHUB_STEP_SUMMARY
+          if [ ${{ steps.fmt.outcome }} == 'success' ]; then
+            echo "✅ Passed" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Failed" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "### TFLint Results" >> $GITHUB_STEP_SUMMARY
+          if [ ${{ steps.tflint.outcome }} == 'success' ]; then
+            echo "✅ No issues found" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "⚠️ Issues found" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "### Security Scan Results" >> $GITHUB_STEP_SUMMARY
+          echo "Check the Security tab for detailed results from:" >> $GITHUB_STEP_SUMMARY
+          echo "- tfsec" >> $GITHUB_STEP_SUMMARY
+          echo "- checkov" >> $GITHUB_STEP_SUMMARY
